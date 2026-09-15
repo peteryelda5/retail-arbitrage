@@ -31,7 +31,7 @@ export default async function DashboardPage() {
       .from("opportunities")
       .select(
         `id, status, estimated_profit, roi_percent, confidence_score, recommended_quantity,
-         retailer_listings ( current_price, retailers ( name ), stores ( name ), products ( title ) ),
+         retailer_listings ( current_price, retailer_id, store_id, retailers ( name ), stores ( name ), products ( title ) ),
          amazon_listings ( amazon_price, buy_box_price )`
       )
       .order("detected_at", { ascending: false })
@@ -51,6 +51,8 @@ export default async function DashboardPage() {
   const cards: OpportunityCardData[] = (recentOpportunities ?? []).map((o: any) => ({
     id: o.id,
     retailer: o.retailer_listings?.retailers?.name ?? "Unknown retailer",
+    retailerId: o.retailer_listings?.retailer_id ?? null,
+    storeId: o.retailer_listings?.store_id ?? null,
     store: o.retailer_listings?.stores?.name ?? null,
     product: o.retailer_listings?.products?.title ?? "Unknown product",
     retailPrice: o.retailer_listings?.current_price ?? 0,
