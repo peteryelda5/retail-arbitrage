@@ -60,7 +60,7 @@ export default async function OpportunitiesPage({
 
       <div className="flex gap-2">
         {filters.map((f) => (
-          
+     <a     
             key={f.label}
             href={f.key ? `/opportunities?status=${f.key}` : "/opportunities"}
             className={`badge ${
