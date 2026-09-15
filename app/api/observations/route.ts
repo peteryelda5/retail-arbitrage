@@ -19,6 +19,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateOpportunity, decideOpportunity, DEFAULT_THRESHOLDS } from "@/lib/opportunity-engine";
 import { matchProduct } from "@/lib/matching-engine";
+import { lookupByUpc } from "@/lib/keepa";
 
 export const runtime = "nodejs";
 
@@ -236,11 +237,49 @@ export async function POST(req: NextRequest) {
   // profitability and upsert an opportunity. If not, we still return success —
   // the product/observation is stored, ready for an Amazon-side sync job to
   // pick up and complete the loop (see Amazon sync route — not yet built).
-  const { data: amazonListing } = await supabase
+  let { data: amazonListing } = await supabase
     .from("amazon_listings")
     .select("id, buy_box_price, amazon_price, fulfillment_type")
     .eq("product_id", productId)
     .maybeSingle();
+
+  // No Amazon data yet for this product — try to pull it from Keepa now (best-effort;
+  // a missing/failed lookup should never break the observation itself).
+  if (!amazonListing && obs.upc) {
+    const keepaResult = await lookupByUpc(obs.upc);
+    if (keepaResult) {
+      const { data: newListing, error: listingInsertErr } = await supabase
+        .from("amazon_listings")
+        .upsert(
+          {
+            product_id: productId,
+            asin: keepaResult.asin,
+            title: keepaResult.title,
+            amazon_price: keepaResult.amazonPrice,
+            buy_box_price: keepaResult.buyBoxPrice,
+            fulfillment_type: "FBA",
+          },
+          { onConflict: "asin", ignoreDuplicates: false }
+        )
+        .select("id, buy_box_price, amazon_price, fulfillment_type")
+        .single();
+
+      if (!listingInsertErr && newListing) {
+        amazonListing = newListing;
+
+        await supabase.from("amazon_snapshots").insert({
+          amazon_listing_id: newListing.id,
+          buy_box_price: keepaResult.buyBoxPrice,
+          sales_rank: keepaResult.salesRank,
+          offer_count: keepaResult.offerCount,
+          fba_fee:
+            (keepaResult.fbaPickAndPackFee ?? 0) + (keepaResult.fbaStorageFee ?? 0) || null,
+          storage_fee_estimate: keepaResult.fbaStorageFee,
+          raw_payload: keepaResult.raw,
+        });
+      }
+    }
+  }
 
   let opportunity = null;
   if (amazonListing) {
