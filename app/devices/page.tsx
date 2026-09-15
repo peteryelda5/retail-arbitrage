@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import DataTable from "@/components/DataTable";
 
@@ -12,9 +13,17 @@ export default async function DevicesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-100">Devices</h1>
-        <p className="text-sm text-muted mt-1">Android collector phones in the field</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-100">Devices</h1>
+          <p className="text-sm text-muted mt-1">Android collector phones in the field</p>
+        </div>
+        <Link
+          href="/devices/new"
+          className="px-3 py-2 text-sm rounded-md bg-accent text-white hover:bg-accent/90"
+        >
+          + Add Device
+        </Link>
       </div>
       <DataTable
         columns={[
@@ -38,7 +47,7 @@ export default async function DevicesPage() {
           },
         ]}
         rows={devices ?? []}
-        emptyMessage="No devices registered yet. Insert a row into `devices` with a device_identifier to onboard your first phone."
+        emptyMessage="No devices registered yet. Click 'Add Device' above to onboard your first phone."
       />
     </div>
   );
