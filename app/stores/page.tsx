@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import DataTable from "@/components/DataTable";
 
@@ -12,9 +13,17 @@ export default async function StoresPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-100">Stores</h1>
-        <p className="text-sm text-muted mt-1">Individual store locations tracked per retailer</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-100">Stores</h1>
+          <p className="text-sm text-muted mt-1">Individual store locations tracked per retailer</p>
+        </div>
+        <Link
+          href="/stores/new"
+          className="px-3 py-2 text-sm rounded-md bg-accent text-white hover:bg-accent/90"
+        >
+          + Add Store
+        </Link>
       </div>
       <DataTable
         columns={[
@@ -25,7 +34,7 @@ export default async function StoresPage() {
           { key: "zip", label: "ZIP" },
         ]}
         rows={stores ?? []}
-        emptyMessage="No stores yet."
+        emptyMessage="No stores yet. Click 'Add Store' above to register your first location."
       />
     </div>
   );
