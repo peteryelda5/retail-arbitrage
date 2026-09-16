@@ -9,11 +9,18 @@ interface Retailer {
   name: string;
 }
 
+interface Store {
+  id: string;
+  name: string;
+}
+
 export default function DeviceForm() {
   const [retailers, setRetailers] = useState<Retailer[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [deviceName, setDeviceName] = useState("");
   const [deviceIdentifier, setDeviceIdentifier] = useState("");
   const [retailerId, setRetailerId] = useState("");
+  const [storeId, setStoreId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -27,6 +34,22 @@ export default function DeviceForm() {
       .then(({ data }) => setRetailers(data ?? []));
   }, []);
 
+  useEffect(() => {
+    setStoreId("");
+
+    if (!retailerId) {
+      setStores([]);
+      return;
+    }
+
+    supabase
+      .from("stores")
+      .select("id, name")
+      .eq("retailer_id", retailerId)
+      .order("name")
+      .then(({ data }) => setStores(data ?? []));
+  }, [retailerId]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -36,6 +59,7 @@ export default function DeviceForm() {
       device_name: deviceName,
       device_identifier: deviceIdentifier,
       retailer_id: retailerId || null,
+      assigned_store_id: storeId || null,
       status: "active",
     });
 
@@ -113,6 +137,32 @@ export default function DeviceForm() {
           </div>
         )}
       </div>
+
+      {retailerId && (
+        <div className="space-y-1">
+          <label className="text-sm text-gray-100">Assigned store (optional)</label>
+          <div className="text-xs text-muted mb-1">
+            Leave blank if this device isn't tied to one specific location
+          </div>
+          <select
+            value={storeId}
+            onChange={(e) => setStoreId(e.target.value)}
+            className="w-full bg-surface2 border border-border rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">None</option>
+            {stores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {stores.length === 0 && (
+            <div className="text-xs text-muted mt-1">
+              No stores yet for this retailer — they're created automatically once a scan reports a store number.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <button
