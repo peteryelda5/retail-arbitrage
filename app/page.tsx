@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     supabase
       .from("opportunities")
       .select(
-        `id, status, estimated_profit, roi_percent, confidence_score, recommended_quantity,
+        `id, status, estimated_profit, roi_percent, confidence_score, recommended_quantity, ai_narrative,
          retailer_listings ( current_price, retailer_id, store_id, retailers ( name ), stores ( name ), products ( title ) ),
          amazon_listings ( amazon_price, buy_box_price )`
       )
@@ -62,6 +62,7 @@ export default async function DashboardPage() {
     confidenceScore: o.confidence_score ?? 0,
     recommendedQuantity: o.recommended_quantity ?? 0,
     status: o.status,
+    aiNarrative: o.ai_narrative ?? null,
   }));
 
   return (

@@ -14,7 +14,7 @@ export default async function OpportunitiesPage({
   let query = supabase
     .from("opportunities")
     .select(
-      `id, status, estimated_profit, roi_percent, confidence_score, recommended_quantity,
+      `id, status, estimated_profit, roi_percent, confidence_score, recommended_quantity, ai_narrative,
        retailer_listings ( current_price, retailer_id, store_id, retailers ( name ), stores ( name ), products ( title ) ),
        amazon_listings ( amazon_price, buy_box_price )`
     )
@@ -39,6 +39,7 @@ export default async function OpportunitiesPage({
     confidenceScore: o.confidence_score ?? 0,
     recommendedQuantity: o.recommended_quantity ?? 0,
     status: o.status,
+    aiNarrative: o.ai_narrative ?? null,
   }));
 
   const filters = [
@@ -60,7 +61,7 @@ export default async function OpportunitiesPage({
 
       <div className="flex gap-2">
         {filters.map((f) => (
-     <a     
+          <a
             key={f.label}
             href={f.key ? `/opportunities?status=${f.key}` : "/opportunities"}
             className={`badge ${

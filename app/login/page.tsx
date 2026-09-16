@@ -78,7 +78,7 @@ export default function LoginPage() {
         </button>
 
         <div className="text-xs text-muted">
-          Accounts are created by an admin in Supabase \u2014 there's no self-signup.
+          Accounts are created by an admin in Supabase — there's no self-signup.
         </div>
       </form>
     </div>

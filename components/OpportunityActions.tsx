@@ -28,7 +28,7 @@ export default function OpportunityActions({
 
   async function handleConfirmPurchase() {
     if (!retailerId) {
-      setError("This opportunity has no retailer on file — can't log a purchase for it.");
+      setError("This opportunity has no retailer on file \u2014 can't log a purchase for it.");
       return;
     }
 

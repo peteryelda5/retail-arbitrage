@@ -1,5 +1,12 @@
 import clsx from "clsx";
 import OpportunityActions from "./OpportunityActions";
+import NarrativeSection from "./NarrativeSection";
+
+interface Narrative {
+  whyLikes: string;
+  whatCanGoWrong: string;
+  whyQuantity: string;
+}
 
 export interface OpportunityCardData {
   id: string;
@@ -15,6 +22,7 @@ export interface OpportunityCardData {
   confidenceScore: number;
   recommendedQuantity: number;
   status: "new" | "watch" | "buy" | "approved" | "purchased" | "rejected" | "expired";
+  aiNarrative: Narrative | null;
 }
 
 const STATUS_LABEL: Record<string, { text: string; className: string }> = {
@@ -62,6 +70,8 @@ export default function OpportunityCard({ opp }: { opp: OpportunityCardData }) {
           )}
         </div>
       </div>
+
+      {opp.aiNarrative && <NarrativeSection narrative={opp.aiNarrative} />}
 
       {isActionable && (
         <OpportunityActions

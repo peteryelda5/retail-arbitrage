@@ -19,6 +19,8 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateOpportunity, decideOpportunity, DEFAULT_THRESHOLDS } from "@/lib/opportunity-engine";
 import { matchProduct } from "@/lib/matching-engine";
+import { lookupByUpc } from "@/lib/keepa";
+import { generateNarrative } from "@/lib/arbiter-narrative";
 
 export const runtime = "nodejs";
 
@@ -236,11 +238,50 @@ export async function POST(req: NextRequest) {
   // profitability and upsert an opportunity. If not, we still return success —
   // the product/observation is stored, ready for an Amazon-side sync job to
   // pick up and complete the loop (see Amazon sync route — not yet built).
-  const { data: amazonListing } = await supabase
+  let { data: amazonListing } = await supabase
     .from("amazon_listings")
     .select("id, buy_box_price, amazon_price, fulfillment_type")
     .eq("product_id", productId)
     .maybeSingle();
+
+  // No Amazon data yet for this product — try to pull it from Keepa now (best-effort;
+  // a missing/failed lookup should never break the observation itself).
+  if (!amazonListing && obs.upc) {
+    const keepaResult = await lookupByUpc(obs.upc);
+    if (keepaResult) {
+      const { data: newListing, error: listingInsertErr } = await supabase
+        .from("amazon_listings")
+        .upsert(
+          {
+            product_id: productId,
+            asin: keepaResult.asin,
+            title: keepaResult.title,
+            amazon_price: keepaResult.amazonPrice,
+            buy_box_price: keepaResult.buyBoxPrice,
+            fulfillment_type: "FBA",
+          },
+          { onConflict: "asin", ignoreDuplicates: false }
+        )
+        .select("id, buy_box_price, amazon_price, fulfillment_type")
+        .single();
+
+      if (!listingInsertErr && newListing) {
+        amazonListing = newListing;
+
+        await supabase.from("amazon_snapshots").insert({
+          amazon_listing_id: newListing.id,
+          buy_box_price: keepaResult.buyBoxPrice,
+          conservative_price: keepaResult.conservativePrice,
+          sales_rank: keepaResult.salesRank,
+          offer_count: keepaResult.offerCount,
+          fba_fee:
+            (keepaResult.fbaPickAndPackFee ?? 0) + (keepaResult.fbaStorageFee ?? 0) || null,
+          storage_fee_estimate: keepaResult.fbaStorageFee,
+          raw_payload: keepaResult.raw,
+        });
+      }
+    }
+  }
 
   let opportunity = null;
   if (amazonListing) {
@@ -263,8 +304,14 @@ export async function POST(req: NextRequest) {
       ),
     };
 
+    // Use the Conservative Expected Selling Price (min of 30/90/180-day medians)
+    // rather than today's Buy Box, so a temporary price spike doesn't make a
+    // bad deal look good. Falls back to the current price when no history exists.
     const amazonSalePrice =
-      latestSnapshot?.buy_box_price ?? amazonListing.buy_box_price ?? amazonListing.amazon_price;
+      latestSnapshot?.conservative_price ??
+      latestSnapshot?.buy_box_price ??
+      amazonListing.buy_box_price ??
+      amazonListing.amazon_price;
 
     if (amazonSalePrice) {
       const calc = calculateOpportunity({
@@ -313,6 +360,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: oppErr.message }, { status: 500 });
       }
       opportunity = oppRow;
+
+      // Generate an AI narrative for BUY/WATCH opportunities only, to control
+      // cost \u2014 a rejected/passed opportunity doesn't need an explanation.
+      // Never blocks the response: a failed narrative just means no narrative.
+      if (oppRow.status === "buy" || oppRow.status === "watch") {
+        const narrative = await generateNarrative({
+          productTitle: obs.title,
+          retailer: obs.retailer,
+          retailCost: obs.price,
+          amazonSalePrice,
+          estimatedProfit: calc.estimatedProfit,
+          roiPercent: calc.roiPercent,
+          marginPercent: calc.marginPercent,
+          confidenceScore,
+          recommendedQuantity: decision === "buy" ? Math.min(obs.inventory_quantity ?? 4, 10) : 0,
+          status: oppRow.status,
+        });
+
+        if (narrative) {
+          await supabase
+            .from("opportunities")
+            .update({ ai_narrative: narrative })
+            .eq("id", oppRow.id);
+        }
+      }
     }
   }
 

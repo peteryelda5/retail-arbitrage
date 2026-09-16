@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
       await supabase.from("amazon_snapshots").insert({
         amazon_listing_id: newListing.id,
         buy_box_price: keepaResult.buyBoxPrice,
+        conservative_price: keepaResult.conservativePrice,
         sales_rank: keepaResult.salesRank,
         offer_count: keepaResult.offerCount,
         fba_fee:
